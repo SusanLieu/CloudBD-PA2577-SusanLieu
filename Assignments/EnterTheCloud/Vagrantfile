@@ -1,0 +1,52 @@
+require 'getoptlong'
+
+ENV['VAGRANT_DEFAULT_PROVIDER']
+
+opts = GetoptLong.new(
+  ['-c', GetoptLong::NO_ARGUMENT],
+  ['--debug', GetoptLong::NO_ARGUMENT],
+  ['--force', '-f', GetoptLong::NO_ARGUMENT],
+  [ '--provider', GetoptLong::OPTIONAL_ARGUMENT ]
+)
+
+opts.each do |opt, arg|
+  case opt
+    when '--provider'
+      ENV['VAGRANT_DEFAULT_PROVIDER']=arg
+  end
+end
+
+Vagrant.configure("2") do |config|
+  config.puppet_install.puppet_version = :latest
+  config.vm.provision :puppet do |puppet|
+    puppet.manifests_path = "./manifests"
+    puppet.manifest_file = "default.pp"
+  end
+
+  case ENV['VAGRANT_DEFAULT_PROVIDER']
+    when 'digital_ocean'
+      config.vm.provider :digital_ocean do |provider, override|
+        override.ssh.private_key_path = '~/.ssh/id_rsa'
+        override.vm.box = 'digital_ocean'
+        override.vm.box_url = "https://github.com/devopsgroup-io/vagrant-digitalocean/raw/master/box/digital_ocean.box"
+        override.nfs.functional = false
+        override.vm.allowed_synced_folder_types = :rsync
+
+        provider.token = $MYTOKEN
+        provider.image = 'ubuntu-18-04-x64'
+        provider.region = 'nyc1'
+        provider.size = '512mb'
+        provider.setup = false
+      end
+    when 'virtualbox'
+      config.vm.box = "bento/ubuntu-18.04"
+  end    
+
+  config.vm.define "appserver" do |appserver|
+    appserver.vm.hostname = "appserver"
+  end
+
+  config.vm.define "dbserver" do |dbserver|
+    dbserver.vm.hostname = "dbserver"
+  end
+end
